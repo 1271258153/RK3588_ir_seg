@@ -1,0 +1,12 @@
+======================================================
+            Memory Profile Info Dump                  
+======================================================
+NPU model memory detail(bytes):
+    Weight Memory: 12.10 MiB
+    Internal Tensor Memory: 10.74 MiB
+    Other Memory: 2.49 MiB
+    Total Memory: 25.34 MiB
+
+INFO: When evaluating memory usage, we need consider  
+the size of model, current model size is: 15.06 MiB       
+======================================================

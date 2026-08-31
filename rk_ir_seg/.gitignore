@@ -1,8 +1,10 @@
-pic/
-output/
+pic/*
+!pic/035.png
+output/*
+!output/eval_mem.txt
 output_kl_divergence/
 output_mmse/
-data/
+data/best.onnx
 h264_out/
 best.onnx
 tools/mediamtx
