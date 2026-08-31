@@ -1,0 +1,57 @@
+# ============ 构建与编译产物 ============
+build/
+install/
+out/
+*.o
+*.obj
+*.a
+*.so
+*.so.*
+*.dll
+*.dylib
+*.exe
+*.elf
+*.out
+compile_commands.json
+
+# ============ 日志文件 ============
+*.log
+1.log
+log/
+logs/
+
+# ============ 模型文件（体积较大，一般不入库） ============
+*.rknn
+*.rknn_precompile
+
+# ============ 第三方库 ============
+opencv/
+
+# ============ 运行结果与测试数据 ============
+result/
+*.h264
+*.mp4
+*.jpg
+*.jpeg
+*.png
+*.bmp
+pic/test.*
+
+# ============ 编辑器 / IDE 配置 ============
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.clangd
+.cache/
+.clang-format
+
+# ============ 备份与临时文件 ============
+*.bak
+*.tmp
+*.temp
+*.orig
+*.rej
+core
+core.*

@@ -1,0 +1,35 @@
+# ============================================
+# Rockchip RK3588 Linux SDK .gitignore
+# ============================================
+
+# ---------- 顶层目录（除 kernel/ 外全部忽略） ----------
+/app/
+/buildroot/
+/debian/
+/device/
+/docs/
+/external/
+/output/
+/prebuilts/
+/rkbin/
+/rockdev
+/rockdev/
+/tools/
+/u-boot/
+/ubuntu/
+
+# repo 工具元数据（含其内部所有文件）
+/.repo
+.repo/
+
+# ---------- 顶层文件（全部忽略） ----------
+/build.sh
+/Makefile
+/rockchip.md
+/rkflash.sh
+/script_run_flag
+
+# ---------- 说明 ----------
+# kernel/ 目录保留，其内部构建产物由 kernel/.gitignore 自动忽略
+
+
