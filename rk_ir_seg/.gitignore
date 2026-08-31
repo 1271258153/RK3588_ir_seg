@@ -7,3 +7,4 @@ h264_out/
 best.onnx
 tools/mediamtx
 tools/__pycache__/
+origin_rknn/
