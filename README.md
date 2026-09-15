@@ -4,7 +4,7 @@
 项目包含：
 
 ## 2. 🎬 视频演示
-https://github.com/user-attachments/assets/cdb546ab-9491-4c9a-99da-e0ddf1c6b1f9
+https://github.com/user-attachments/assets/e4708373-ff4a-4a54-a312-d8f9434c9642
 
 ## 3. 🖥️ 开发环境
 <div align="center">
