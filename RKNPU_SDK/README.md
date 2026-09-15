@@ -38,7 +38,7 @@ adb push install /
 adb push pic /install/pidnet_Linux  # 拷贝测试的图片
 # 进入开发板
 cd /install/pidnet_Linux
-./seg_single ./model/RK3588/best.rknn pic/img/xxx.png
+sudo ./seg_single ./model/RK3588/best.rknn pic/img/xxx.png
 ```
 
 ### 4. 评估rknn模型的miou

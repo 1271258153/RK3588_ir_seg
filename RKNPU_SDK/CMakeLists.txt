@@ -128,9 +128,19 @@ target_link_libraries(rtsp_seg
   ${RGA_LIB}
   ${OpenCV_LIBS})
 
+# mipi_seg: MIPI 摄像头 V4L2 采集 -> RGA 预处理 -> NPU 分割 -> 保存叠加图
+add_executable(mipi_seg
+        src/rga_utils.cpp
+        src/rknn_infer.cpp
+        src/mipi_seg_main.cc)
+target_link_libraries(mipi_seg
+  ${RKNN_RT_LIB}
+  ${RGA_LIB}
+  ${OpenCV_LIBS})
+
 # install target and libraries
 set(CMAKE_INSTALL_PREFIX ${CMAKE_SOURCE_DIR}/install/pidnet_${CMAKE_SYSTEM_NAME})
-install(TARGETS rknn_query seg_single eval_miou dec_test rtsp_seg DESTINATION ./)
+install(TARGETS rknn_query seg_single eval_miou dec_test rtsp_seg mipi_seg DESTINATION ./)
 install(PROGRAMS ${RKNN_RT_LIB} DESTINATION lib)
 install(PROGRAMS ${RGA_LIB} DESTINATION lib)
 install(PROGRAMS ${MPP_LIBS} DESTINATION lib)

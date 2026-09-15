@@ -1,100 +1,134 @@
-# RK3588 Camera 驱动说明
+# i.RK3588_ir_seg
+## 1. Overview
+基于 RK3588 红外发热检测系统设计。将模型部署至RK3588开发板中，通过MIPI或网络摄像头，调用RGA和MPP API函数对红外图像或视频流进行Resize和硬解码，再通过NPU进行语义分割，最后输出叠加图和分割mask。
+项目包含：
 
-## 一、驱动源码目录树
+## 2. 🎬 视频演示
 
-```txt
-kernel/
-├── arch/arm64/boot/dts/rockchip/
-│   ├── rk3588s.dtsi                        # SoC 基础 DTS（csi2_dphy/dcphy、mipiN_csi2、rkcif、rkisp 节点定义）
-│   └── topeet-camera-config.dtsi           # 板级相机配置（J1~J4 接口、sensor、endpoint 连接）
-│
-├── drivers/media/i2c/                      # Sensor 驱动
-│   ├── ov5695.c                            # OV5695 5MP sensor
-│   ├── ov13850.c                           # OV13850 13MP sensor
-│   └── imx415.c                            # Sony IMX415 4K sensor
-│
-├── drivers/phy/rockchip/                   # MIPI D-PHY / C-PHY 驱动
-│   ├── phy-rockchip-csi2-dphy.c            # CSI2 DPHY 框架层（csi2_dphy0~5）
-│   ├── phy-rockchip-csi2-dphy-hw.c          # CSI2 DPHY 硬件层（csi2_dphy0_hw/1_hw）
-│   ├── phy-rockchip-csi2-dphy-common.h      # DPHY 公共定义
-│   └── phy-rockchip-inno-mipi-dphy.c        # Innosilicon MIPI DPHY
-│
-├── drivers/media/platform/rockchip/
-│   ├── cif/                                # RKCIF —— MIPI/LVDS/DVP 输入捕获
-│   │   ├── dev.c / dev.h                   # CIF 设备注册、v4l2/media 框架
-│   │   ├── hw.c / hw.h                     # CIF 寄存器级硬件操作
-│   │   ├── common.c / common.h             # CIF 公共接口
-│   │   ├── capture.c                       # CIF 视频捕获节点（/dev/video）
-│   │   ├── mipi-csi2.c / mipi-csi2.h       # mipiN_csi2 子设备（CSI2 接收）
-│   │   ├── cif-scale.c                     # CIF scaler
-│   │   ├── cif-luma.c / cif-luma.h          # Luma 统计
-│   │   ├── subdev-itf.c / subdev-itf.h      # CIF 对外 subdev 接口（含 sditf）
-│   │   ├── procfs.c / procfs.h             # procfs 调试
-│   │   ├── regs.h                          # 寄存器定义
-│   │   └── version.h
-│   │
-│   ├── isp/                                # RKISP —— ISP 图像处理
-│   │   ├── rkisp.c / rkisp.h               # ISP 平台驱动入口
-│   │   ├── dev.c / dev.h                   # ISP 设备注册
-│   │   ├── hw.c / hw.h                     # ISP 硬件操作
-│   │   ├── common.c / common.h             # ISP 公共
-│   │   ├── csi.c / csi.h                   # ISP CSI 输入（rkisp_vir0~3）
-│   │   ├── bridge.c / bridge.h             # ISP bridge（输入路径桥接）
-│   │   ├── dmarx.c / dmarx.h               # DMA 接收
-│   │   ├── capture.c / capture.h           # ISP 视频输出节点
-│   │   ├── isp_params.c / isp_params.h      # 3A 参数下发
-│   │   ├── isp_stats.c / isp_stats.h        # 3A 统计上报
-│   │   ├── isp_ispp.h                      # ISP <-> ISPP 交互接口
-│   │   ├── isp_external.h                 # ISP 对外接口
-│   │   ├── regs.h / regs.c                 # 寄存器
-│   │   └── *_v1x/*_v2x/*_v3x.*             # 各 ISP 版本实现
-│   │
-│   └── ispp/                               # RKISPP —— ISP 后处理
-│       ├── stream.c / stream.h             # ISPP 视频流（输入/输出节点）
-│       ├── dev.c / dev.h                   # ISPP 设备注册
-│       ├── hw.c / hw.h                     # ISPP 硬件
-│       ├── common.c / common.h             # ISPP 公共
-│       ├── ispp.c / ispp.h                 # ISPP 核心
-│       ├── params.c / params.h             # 后处理参数下发
-│       ├── stats.c / stats.h               # 统计上报
-│       ├── fec.c / fec.h                   # FEC（去畸变）
-│       ├── procfs.c / procfs.h             # procfs 调试
-│       └── regs.h
-│
-└── include/
-    └── uapi/linux/rk-camera-module.h        # camera-module 用户态 ABI（module-index/facing/lens 等）
+## 3. 🖥️ 开发环境
+<div align="center">
+  <img src="pic/RK3588.png" width="500" alt="Markdown Logo">
+</div>
+
+| 参数 | Value |
+| --- | --- |
+| CPU | RK3588 |
+| 主频 | 四核 Cortex-A55, Quad-core ARM Cortex-A76,Neon and FPU， 2.4GHz |
+| 内存 | 4GB |
+| 存储介质 | 32GB EMMC |
+| GPU | ARM Mali-G610 MP4,OpenGL ES1.1/2.0/3.2, Vulkan 1.2, OpenCL 2.2 |
+| NPU | 支持 6T 算力 |
+| 系统 | Ubuntu 20.04 |
+| 内核版本 | 5.10.198 |
+
+- 虚拟机版本：`20.04.6 LTS`
+- 交叉编译器：`gcc-arm-10.3-2021.07-x86_64-aarch64-none-linux-gnu`
+- 工具：Miniconda、Python 3.8、RKNN-Toolkit2-1.6、RKNN-Toolkit-Lite2-1.6、RKNPU2
+
+## 4. 📁 仓库目录说明
+```text
+rk3588-linux/
+├── README.md                          # 项目说明
+├── pic/                               # README 配图
+├── rk_ir_seg/                         # 红外图像分割模型转换与量化
+│   ├── data/                          # ONNX 模型与量化数据集配置
+│   ├── output/                        # 不同量化方式的输出结果
+│   └── tools/                         # 模型转换、评测与性能分析脚本
+├── RKNPU_SDK/                         # RK3588 端侧推理应用
+│   ├── include/                       # RKNN、RGA、MPP 等头文件与依赖
+│   ├── model/RK3588/                  # rknn文件
+│   ├── src/                           # 图像/视频流分割与评测源码
+│   ├── CMakeLists.txt                 # CMake 构建配置
+│   └── build-linux_RK3588.sh          # RK3588 交叉编译脚本
+└── kernel/                            # RK3588 Linux 内核源码
 ```
 
-## 二、数据通路（Pipeline）
+## 5. 项目描述
+1. 开发板开启rknn_serve服务
+<div align="center">
+  <img src="pic/rknn_server.png" width="500" alt="Markdown Logo">
+</div>
 
-`topeet-camera-config.dtsi` 通过 `#define CAMERA_Jx` 选择接口，每个接口构成一条完整 pipeline：
+2. 导出rknn，进行混合量化[说明文档](rk_ir_seg/README.md)
+```bash
+cd rk_ir_seg/tools
+python tools/accuracy_analysis.py      # 量化精度分析，需要连接开发板
+python tools/step1.py                  # 量化step1,生成cfg文件
+python tools/step2.py                  # 量化step2,导出best.rknn，需要连接开发板
+python tools/eval_perf.py              # 评估性能
+python tools/eval_mem.py               # 评估内存
+python tools/eval_summary.py           # 推算大致的fps
+```
 
-```txt
+3. 通过NPU进行语义分割，输出叠加图和分割mask[说明文档](RKNPU_SDK/README.md)
+- 构建[CMake工程](RKNPU_SDK/CMakeLists.txt)
+把整个 install/pidnet_Linux/ 目录拷到 RK3588 板子的根目录：
+```bash
+cd RKNPU_SDK/
+./build-linux_RK3588.sh                # 重新编译
+adb push install /                     # 拷贝到开发板的根目录
+adb push ./pic /install/pidnet_Linux   # 拷贝测试的图片
+# 进入开发板
+cd /install/pidnet_Linux
+./seg_single ./model/RK3588/best.rknn pic/img/xxx.png    # 查看单张图片的预测叠加图
+```
+<div align="center">
+  <img src="pic/predict.png" width="500" alt="Markdown Logo">
+</div>
+
+4. RTSP 拉流 -> MPP 硬解 -> RGA -> NPU 推理 (rtsp_seg)
+> FFmpeg 拉 RTSP -> 剥离协议容器得 H.264 包 -> MPP 硬解出 NV12 -> RGA 缩放转 RGB640x640 -> NPU 语义分割 -> 保存叠加图。
+```bash
+# 打开虚拟机
+# 1. 将图片转为h264流
+ffmpeg -y -framerate 25 -pattern_type glob -i 'h264_out/by_res/1280x720/*.png' \
+  -c:v libx264 -profile:v high -level 4.0 \
+  -pix_fmt yuv420p -bf 0 -g 25 -x264-params "annexb=1" \
+  -an -f h264 h264_out/1280x720.h264
+
+# 2. 裸流 → MP4
+ffmpeg -y -framerate 25 -i h264_out/1280x720.h264 -c copy h264_out/1280x720.mp4
+
+# 3. 另开终端，在虚拟机上开启流媒体服务器，接收ffmpeg推流，并提供rtsp拉流服务
+cd /home/topeet/rk3588-linux/rk_ir_seg/tools/mediamtx
+./mediamtx ./mediamtx.yml
+
+# 4. ffmpeg循环推流
+cd /home/topeet/rk3588-linux/rk_ir_seg
+ffmpeg -re -stream_loop -1 -i h264_out/1280x720.mp4 \
+  -c copy -f rtsp -rtsp_transport tcp rtsp://127.0.0.1:8554/cam
+
+# 5. 进入开发板(拉流地址指向 PC 的 MediaMTX)
+# (虚拟机先启动推流; 板子IP 192.168.137.10, 虚拟机IP 192.168.137.3)
+cd /install/pidnet_Linux
+sudo ./rtsp_seg rtsp://192.168.137.3:8554/cam model/RK3588/best.rknn h264_test 20 3  # 使用3线程(最多6线程)推理出20张图片在 h264_test/下
+```
+<div align="center">
+  <img src="pic/predict.png" width="500" alt="Markdown Logo">
+  <img src="pic/RTSP&predict.png" width="500" alt="Markdown Logo">
+</div>
+
+5. 通过mipi摄像头进行预测
+先在开发板中运行rkaiq_3A_server
+<div align="center">
+  <img src="pic/rkaiq_3A_server.png" width="500" alt="Markdown Logo">
+</div>
+
+另开终端，运行mipi_seg，进行预测
+```bash
+# 使用3线程(最多6线程)推理出20张图片在 mipi_output/下
+./mipi_seg /dev/video11 model/RK3588/best.rknn mipi_output 20 3
+```
+<div align="center">
+  <img src="pic/mipi_predict.png" width="500" alt="Markdown Logo">
+</div>
+
+## 6. sensor 数据通路(pipeline)
+```text
 Sensor ──► MIPI DPHY/DCPHY ──► mipiN_csi2 ──► rkcif_mipi_lvdsN ──► rkcif_..._sditf ──► rkispN_vir0 ──► (rkispp)
 ```
-
-| 接口 | Sensor (i2c)        | PHY 节点        | CSI2 节点    | RKCIF 节点            | SDITF 节点                  | ISP 节点       | PHY 类型 |
-|------|---------------------|-----------------|--------------|-----------------------|-----------------------------|----------------|----------|
-| J1 ✅ | ov5695/ov13850/imx415 (i2c4) | csi2_dphy3      | mipi4_csi2   | rkcif_mipi_lvds4      | rkcif_mipi_lvds4_sditf      | rkisp0_vir0    | D-PHY    |
-| J2   | ov5695/ov13850/imx415 (i2c7) | csi2_dcphy1     | mipi1_csi2   | rkcif_mipi_lvds1      | rkcif_mipi_lvds1_sditf      | rkisp1_vir0    | C-PHY    |
-| J3   | ov5695/ov13850/imx415 (i2c3) | csi2_dphy0      | mipi2_csi2   | rkcif_mipi_lvds2      | rkcif_mipi_lvds2_sditf      | rkisp0_vir0    | D-PHY    |
-| J4   | ov5695/ov13850/imx415 (i2c2) | csi2_dcphy0     | mipi0_csi2   | rkcif_mipi_lvds       | rkcif_mipi_lvds_sditf       | rkisp1_vir0    | C-PHY    |
-
-> ✅ = 默认启用（`#define CAMERA_J1`）。J2/J3/J4 默认注释掉，按需打开。
-
-### 各级职责
-
-- **Sensor** (`drivers/media/i2c/`)：输出 RAW MIPI 数据。
-- **DPHY/DCPHY** (`drivers/phy/rockchip/`)：MIPI 物理层，D-PHY（csi2_dphyN）走传统 MIPI CSI-2；C-PHY（csi2_dcphyN）走 D-PHY+ 组合。
-- **mipiN_csi2** (`cif/mipi-csi2.c`)：CSI2 接收子设备，解析 MIPI 包。
-- **rkcif_mipi_lvdsN** (`cif/`)：RKCIF 捕获，DMA 写入 DDR，输出 `/dev/videoN`，或经 SDITF 送往 ISP。
-- **sditf** (`cif/subdev-itf.c`)：CIF → ISP 的同步数据接口（Self-Defined Interface）。
-- **rkispN_vir0** (`isp/`)：ISP 虚拟通道输入，做去马赛克/3A/缩放/降噪，输出 `/dev/videoN`。
-- **rkispp** (`ispp/stream.c`)：可选的后处理（FEC 去畸变、多帧降噪等）。
-
-
-## 三、阅读顺序
-1. [Sensor 驱动](kernel/drivers/media/i2c/ov5695.c)
+### ⚙️ 驱动源码路径
+1. [Sensor 驱动](kernel/drivers/media/i2c/imx415.c)
 2. [DTS 连接关系](kernel/arch/arm64/boot/dts/rockchip/topeet-camera-config.dtsi)
    phy、csi设备树:只看 csi2_dphy3、mipi4_csi2、rkcif_mipi_lvds、rkisp0_vir0 这几个节点的 compatible 和 reg，知道每级对应哪个驱动.[phy](kernel/arch/arm64/boot/dts/rockchip/rk3588s.dtsi)
 3. MIPI D-PHY（物理层）:
@@ -109,26 +143,4 @@ Sensor ──► MIPI DPHY/DCPHY ──► mipiN_csi2 ──► rkcif_mipi_lvdsN
    2. [配置 CIF 输入格式、DMA 地址、帧中断](kernel/drivers/media/platform/rockchip/cif/hw.c)
    3. [视频捕获节点、vb2_ops、start_streaming、中断处理](kernel/drivers/media/platform/rockchip/cif/capture.c)
    4. [SDITF：CIF → ISP 的同步接口](kernel/drivers/media/platform/rockchip/cif/subdev-itf.c)
-6. RKISP 图像处理：
-   1. [ISP 平台驱动入口](kernel/drivers/media/platform/rockchip/isp/rkisp.c)
-   2. [接收来自 sditf 的数据](kernel/drivers/media/platform/rockchip/isp/csi.c)
-   3. [ISP 内部 bridge，输入路径选择](kernel/drivers/media/platform/rockchip/isp/bridge.c)
-   4. [ISP 输出节点](kernel/drivers/media/platform/rockchip/isp/capture.c)
-   5. [3A 参数下发接口（用户态 → ISP）](kernel/drivers/media/platform/rockchip/isp/isp_params.c)
-   6. [3A 统计上报（ISP → 用户态）](kernel/drivers/media/platform/rockchip/isp/isp_stats.c)
-7. RKISPP 后处理：
-   1. [SPP 视频流：输入来自 ISP，输出经 FEC/降噪后再出 video 节点](kernel/drivers/media/platform/rockchip/ispp/stream.c)
-   2. [ISPP 平台驱动入口](kernel/drivers/media/platform/rockchip/ispp/dev.c)
-```txt
-1. spec.md                          ← 整体拓扑
-2. rk-camera-module.h               ← ABI 约定
-3. ov5695.c                         ← sensor 怎么发 MIPI
-4. topeet-camera-config.dtsi (J1)   ← 怎么连起来
-5. phy-rockchip-csi2-dphy.c/hw.c    ← 物理层
-6. cif/mipi-csi2.c                  ← CSI2 接收
-7. cif/dev.c + capture.c            ← DMA 捕获
-8. cif/subdev-itf.c                 ← CIF→ISP 接口
-9. isp/rkisp.c + csi.c + capture.c  ← ISP 处理与输出
-10. isp/isp_params.c + isp_stats.c   ← 3A 接口
-11. ispp/stream.c                   ← 后处理（进阶）
-```
+

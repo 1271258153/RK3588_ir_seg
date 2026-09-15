@@ -94,7 +94,7 @@ python tools/eval_summary.py        # 推算大致的fps
 > `pic/` 含 4 种分辨率，**必须分开编码**（单路 H.264 不能混分辨率）。
 
 ```bash
-cd /home/topeet/pidnet
+cd /home/topeet/rk3588-linux/rk_ir_seg
 mkdir -p h264_out/by_res/{1280x720,640x480,1080x1440,480x640}
 
 # 0) 按分辨率分类（只需一次；需 identify / imagemagick）
@@ -142,11 +142,11 @@ ffmpeg -y -framerate 25 -i h264_out/1080x1440.h264 -c copy h264_out/1080x1440.mp
 ffmpeg -y -framerate 25 -i h264_out/480x640.h264  -c copy h264_out/480x640.mp4
 
 # 3) 启动 MediaMTX（另开终端）
-cd /home/topeet/pidnet/tools/mediamtx
+cd /home/topeet/rk_ir_seg/tools/mediamtx
 ./mediamtx ./mediamtx.yml
 
 # 4) 任选一路循环推流
-cd /home/topeet/pidnet
+cd /home/topeet/rk_ir_seg
 ffmpeg -re -stream_loop -1 -i h264_out/1280x720.mp4 \
   -c copy -f rtsp -rtsp_transport tcp rtsp://127.0.0.1:8554/cam
 # 其他：cam480←640x480.mp4  cam1440←1080x1440.mp4  cam640v←480x640.mp4
