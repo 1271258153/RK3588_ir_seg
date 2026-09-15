@@ -1,7 +1,15 @@
 # i.RK3588_ir_seg
 ## 1. Overview
-基于 RK3588 红外发热检测系统设计。将模型部署至RK3588开发板中，通过MIPI或网络摄像头，调用RGA和MPP API函数对红外图像或视频流进行Resize和硬解码，再通过NPU进行语义分割，最后输出叠加图和分割mask。
-项目包含：
+
+本项目面向红外发热检测场景，基于 RK3588 开发板实现图像采集、硬件加速预处理与语义分割。将 ONNX 分割模型转换、混合量化为 RKNN 模型后，部署到板端 NPU，支持单张红外图像、RTSP 视频流和 MIPI 摄像头三种输入方式，并将分割结果可视化，便于观察目标区域。
+
+对于 RTSP 视频流，使用 FFmpeg 拉流、MPP 硬解码和 RGA 图像缩放与格式转换，再交由 NPU 推理；对于 MIPI 摄像头，通过 V4L2 采集图像并接入分割流程。单图推理可输出预测叠加图和分割 mask，视频与摄像头示例可保存预测叠加图。
+
+项目主要包含：
+
+- **模型转换与量化**：完成 ONNX → RKNN 转换、量化精度分析、混合量化及性能和内存评估。
+- **板端分割应用**：提供单图、RTSP 和 MIPI 推理示例，使用 RGA、MPP、NPU 完成各输入路径的处理，并支持视频与摄像头的多线程推理。
+- **采集链路说明**：梳理 Sensor、MIPI、CIF 与 ISP 的数据通路，以及对应的设备树配置和驱动源码入口。
 
 ## 2. 🎬 视频演示
 https://github.com/user-attachments/assets/c64ca59b-a264-4f0e-982a-58f515826782
@@ -44,7 +52,8 @@ rk3588-linux/
 └── kernel/                            # RK3588 Linux 内核源码
 ```
 
-## 5. 项目描述
+## 5. 🚀 模型部署与推理流程
+
 1. 开发板开启rknn_serve服务
 <div align="center">
   <img src="pic/rknn_server.png" width="500" alt="Markdown Logo">
@@ -115,7 +124,7 @@ sudo ./rtsp_seg rtsp://192.168.137.3:8554/cam model/RK3588/best.rknn h264_test 2
   <img src="pic/rkaiq_3A_server.png" width="500" alt="Markdown Logo">
 </div>
 
-另开终端，运行mipi_seg，进行预测
+另开终端，运行 mipi_seg，进行预测
 ```bash
 # 使用3线程(最多6线程)推理出20张图片在 mipi_output/下
 ./mipi_seg /dev/video11 model/RK3588/best.rknn mipi_output 20 3
@@ -124,7 +133,7 @@ sudo ./rtsp_seg rtsp://192.168.137.3:8554/cam model/RK3588/best.rknn h264_test 2
   <img src="pic/mipi_predict.png" width="500" alt="Markdown Logo">
 </div>
 
-## 6. sensor 数据通路(pipeline)
+## 6. 📷 sensor 数据通路(pipeline)
 ```text
 Sensor ──► MIPI DPHY/DCPHY ──► mipiN_csi2 ──► rkcif_mipi_lvdsN ──► rkcif_..._sditf ──► rkispN_vir0 ──► (rkispp)
 ```
@@ -144,4 +153,3 @@ Sensor ──► MIPI DPHY/DCPHY ──► mipiN_csi2 ──► rkcif_mipi_lvdsN
    2. [配置 CIF 输入格式、DMA 地址、帧中断](kernel/drivers/media/platform/rockchip/cif/hw.c)
    3. [视频捕获节点、vb2_ops、start_streaming、中断处理](kernel/drivers/media/platform/rockchip/cif/capture.c)
    4. [SDITF：CIF → ISP 的同步接口](kernel/drivers/media/platform/rockchip/cif/subdev-itf.c)
-
