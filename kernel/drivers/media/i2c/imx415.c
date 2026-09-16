@@ -2423,6 +2423,16 @@ unlock_and_return:
 	return ret;
 }
 
+/*
+ * 上电时序：
+ * 1. 若存在默认 pinctrl 状态，先切换引脚配置。
+ * 2. 非 thunderboot：使能 dvdd/dovdd/avdd，再将 power GPIO 置为逻辑 1；
+ *    等待 10~20 ms 后将 reset GPIO 置为逻辑 0，解除复位；
+ *    再等待 10~20 ms，才配置并使能 xvclk。
+ * 3. 将 xvclk 设为当前模式要求的频率并使能；非 thunderboot 再等待
+ *    20~30 ms，之后才允许访问传感器寄存器。
+ * thunderboot 下跳过电源、GPIO 和上述等待，仅配置引脚与 xvclk。
+ */
 int __imx415_power_on(struct imx415 *imx415)
 {
 	int ret;
@@ -2909,6 +2919,7 @@ static int imx415_probe(struct i2c_client *client,
 	if (!imx415)
 		return -ENOMEM;
 
+	/* 读取模组编号、摄像头朝向、模组名称、镜头名称 */
 	ret = of_property_read_u32(node, RKMODULE_CAMERA_MODULE_INDEX,
 				   &imx415->module_index);
 	ret |= of_property_read_string(node, RKMODULE_CAMERA_MODULE_FACING,
@@ -2928,15 +2939,17 @@ static int imx415_probe(struct i2c_client *client,
 		dev_warn(dev, " Get hdr mode failed! no hdr default\n");
 	}
 
+	/* 找到设备树的endpoint节点 */
 	endpoint = of_graph_get_next_endpoint(dev->of_node, NULL);
 	if (!endpoint) {
 		dev_err(dev, "Failed to get endpoint\n");
 		return -EINVAL;
 	}
 
+	/* 解析刚才获取endoint，把endoint中的属性写入bus_cfg */
 	ret = v4l2_fwnode_endpoint_parse(of_fwnode_handle(endpoint),
 		&imx415->bus_cfg);
-	of_node_put(endpoint);
+	of_node_put(endpoint);	// 释放句柄
 	if (ret) {
 		dev_err(dev, "Failed to get bus config\n");
 		return -EINVAL;
@@ -2992,6 +3005,7 @@ static int imx415_probe(struct i2c_client *client,
 		dev_info(dev, "no pinctrl\n");
 	}
 
+	/* 没用到regulator_bulk，而是摄像头的引脚直接接到了电源上，启动开发板就有电压 */
 	ret = imx415_configure_regulators(imx415);
 	if (ret) {
 		dev_err(dev, "Failed to get power regulators\n");
@@ -3001,20 +3015,25 @@ static int imx415_probe(struct i2c_client *client,
 	mutex_init(&imx415->mutex);
 
 	sd = &imx415->subdev;
+	/* 初始化 v4l2_subdev,绑定core、video、pad 操作函数 */
 	v4l2_i2c_subdev_init(sd, client, &imx415_subdev_ops);
+	/* 初始化v4l2控件，包括链路频率、像素速率、水平/垂直消隐、曝光、模拟增益和水平/垂直翻转 */
 	ret = imx415_initialize_controls(imx415);
 	if (ret)
 		goto err_destroy_mutex;
 
+	/* 上电 */
 	ret = __imx415_power_on(imx415);
 	if (ret)
 		goto err_free_handler;
 
+	/* 检查chip id */
 	ret = imx415_check_sensor_id(imx415, client);
 	if (ret)
 		goto err_power_off;
 
 #ifdef CONFIG_VIDEO_V4L2_SUBDEV_API
+	/* internal_ops 的 open/close 只在 subdev 有自己的设备节点时才会被调用 */
 	sd->internal_ops = &imx415_internal_ops;
 	sd->flags |= V4L2_SUBDEV_FL_HAS_DEVNODE |
 		     V4L2_SUBDEV_FL_HAS_EVENTS;
@@ -3036,6 +3055,8 @@ static int imx415_probe(struct i2c_client *client,
 	snprintf(sd->name, sizeof(sd->name), "m%02d_%s_%s %s",
 		 imx415->module_index, facing,
 		 IMX415_NAME, dev_name(sd->dev));
+
+	/* 注册异步通知器，异步注册子设备 */
 	ret = v4l2_async_register_subdev_sensor_common(sd);
 	if (ret) {
 		dev_err(dev, "v4l2 async register subdev failed\n");
