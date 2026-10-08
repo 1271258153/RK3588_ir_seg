@@ -491,7 +491,7 @@ int main(int argc, char **argv)
     struct sigaction sa = {};
     sa.sa_handler = stop_capture;
     sigemptyset(&sa.sa_mask);
-    sigaction(SIGINT, &sa, NULL);
+    sigaction(SIGINT, &sa, NULL); // 用户按下ctrl+c时触发stop_capture,g_stop置1,停止采集
     sigaction(SIGTERM, &sa, NULL);
     printf("摄像头: %s\n模型: %s\n输出目录: %s\n最大保存: %d (之后继续推理)\n线程数: %d\n",
            device, model, output, max_save, thread_num);
@@ -520,7 +520,7 @@ int main(int argc, char **argv)
         ctx.output = output;
         ctx.max_save = max_save;
         ctx.preview = preview.enabled(); // 提交任务后保持只读，避免工作线程与窗口状态发生竞争。
-        dpool::ThreadPool pool(thread_num);
+        dpool::ThreadPool pool(thread_num); // 创建3个线程池
         std::deque<std::future<FrameResult>> pending;
         auto start = std::chrono::steady_clock::now(), last = start;
         unsigned long long submitted = 0, completed = 0, succeeded = 0;
@@ -575,6 +575,14 @@ int main(int argc, char **argv)
             if (ret < 0) { status = 1; break; }
             if (!ret || g_stop) continue;
             size_t slot = submitted % static_cast<size_t>(thread_num);
+            /* 摄像头每采集到一帧，就提交一个任务。
+               每个任务执行一次 infer_frame()：
+               RGA图像预处理
+                → RKNN NPU推理
+                → 分割后处理
+                → 生成叠加图
+                → 保存图片
+             */
             pending.push_back(pool.submit(infer_frame, engines[slot].get(), std::move(bgr), submitted, &ctx));
             ++submitted;
         }
